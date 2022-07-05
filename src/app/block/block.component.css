@@ -1,0 +1,26 @@
+.block {
+  border: 1px solid gray;
+  background: #daeef5;
+}
+
+.block.selected {
+  border: 1px solid red;
+  background: #b3ecfe;
+}
+
+.children {
+  margin-left: 1em;
+}
+
+.content {
+  margin: 0;
+  padding: 0.5em;
+  display: flex;
+}
+
+.content > .id {
+  color: gray;
+  padding-right: 1em;
+}
+
+

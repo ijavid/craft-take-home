@@ -1,0 +1,10 @@
+<div [ngClass]="selectedBlock?.id === block.id ? 'selected' : ''" class="block">
+  <div (click)="selected.emit(block)" class="content">
+    <div class="id">{{block.id}}</div>
+    <div>{{block.content}}</div>
+  </div>
+  <div class="children">
+    <app-block (selected)="selected.emit($event)" *ngFor="let sub of block.children" [block]="sub"
+               [selectedBlock]="selectedBlock"></app-block>
+  </div>
+</div>
