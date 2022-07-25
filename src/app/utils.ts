@@ -26,17 +26,12 @@ export function insertAfterItem<T>(array: T[], item: T, afterItem: T) {
   return array;
 }
 
-
-// https://stackoverflow.com/questions/30304719/javascript-fastest-way-to-remove-object-from-array
 export function removeFromArray<T>(array: T[], predicate: (o: T) => boolean) {
-  let i, j;
-  for (i = 0, j = 0; i < array.length; ++i) {
+  for (let i = 0; i < array.length; i++) {
     if (predicate(array[i])) {
-      array[j] = array[i];
-      ++j;
+      array.splice(i, 1);
+      i--;
     }
   }
-  while (j < array.length) {
-    array.pop();
-  }
+  return array;
 }

@@ -1,35 +1,35 @@
 import { Injectable } from '@angular/core';
 import { insertAfterItem, insertAtIndex, removeFromArray } from "./utils";
 
-
-// Model - contains circular references, cannot be persisted as is...
+// Model
 export class Block {
 
   public content: string;
-  public parent?: Block;
+  public parent?: string; // reference to parent, using an object here will result in circular structure
   public readonly id: string;
   public readonly children: Block[];
 
-  constructor(content?: string, parent?: Block) {
+  constructor(content?: string, parentId?: string) {
     this.id = Math.floor(Math.random() * 10_000_000).toString(16);
     this.content = content || '';
-    this.parent = parent;
+    this.parent = parentId;
     this.children = [];
   }
 
-  get parentId() {
-    return this.parent?.id
-  }
-
-  clone(newParent: Block | undefined = this.parent, onClone?: (clonedBlock: Block) => void): Block {
+  clone(newParent: string | undefined, onClone?: (clonedBlock: Block) => void): Block {
     const clonedBlock = new Block(this.content, newParent);
-    this.children.forEach((o, i) => clonedBlock.children[i] = o.clone(clonedBlock, onClone));
+    this.children.forEach((o, i) => clonedBlock.children[i] = o.clone(clonedBlock.id, onClone));
     onClone && onClone(clonedBlock);
     return clonedBlock;
   }
 
   equal(block: Block | undefined): boolean {
     return !!block && this === block && this.id === block.id;
+  }
+
+  // helper for export
+  getContentWithSubs(): string[] {
+    return [this.content, ...this.children.flatMap(ch => ch.getContentWithSubs())];
   }
 
 }
@@ -65,8 +65,17 @@ export class DocumentStorageService {
   }
 
   // inserts to bottom
-  public insert(blocks: Block[]) {
+  public insert(blocks: Block[], parentId?: string) {
     blocks.forEach(block => {
+      // check if it was already inserted
+      if (this.blocks[block.id]) {
+        return;
+      }
+      // set parent if required
+      if (parentId) {
+        block.parent = parentId;
+      }
+      // alters the array
       insertAtIndex(this.getSiblings(block), block);
       // update indexes
       this.blocks[block.id] = block;
@@ -76,8 +85,15 @@ export class DocumentStorageService {
 
   public delete(blocks: Block[]) {
     blocks.forEach(block => {
+      // check if it was already deleted
+      if (!this.blocks[block.id]) {
+        return;
+      }
+
+      // delete all children first
+      this.delete(this.childrenById[block.id]); // === block.children
+      // delete the block
       this.removeBlock(this.getSiblings(block), block);
-      this.delete(this.childrenById[block.id]); // block.children
 
       // update indexes
       delete this.blocks[block.id];
@@ -103,12 +119,16 @@ export class DocumentStorageService {
     }
 
     if (newIndex < 0) {
-      throw new Error('Invalid argument');
+      throw new Error('Invalid newIndex');
+    }
+
+    if (newIndex > this.getSiblings(block).length) {
+      throw new Error('Invalid newIndex');
     }
 
     this.removeBlock(this.getSiblings(block), block);
 
-    block.parent = newParent;
+    block.parent = newParent?.id;
     insertAtIndex(this.getSiblings(block), block, newIndex);
   }
 
@@ -117,13 +137,14 @@ export class DocumentStorageService {
    * Duplicate an existing block with all of its subblocks (including all levels of subblocks in the hierarchy)
    *  The location of the duplicated block should be under the original block
    */
-  public duplicate(block: Block) {
+  public duplicate(block: Block): Block {
     const clone = block.clone(block.parent, (clonedBlock) => {
       // update indexes
-      this.blocks[clone.id] = clonedBlock;
-      this.childrenById[clone.id] = clonedBlock.children;
+      this.blocks[clonedBlock.id] = clonedBlock;
+      this.childrenById[clonedBlock.id] = clonedBlock.children;
     });
     insertAfterItem(this.getSiblings(block), clone, block);
+    return clone;
   }
 
   /**
@@ -132,21 +153,17 @@ export class DocumentStorageService {
    *
    * The output should contain the plain text content of all blocks (including subblocks on any level)
    */
-  public export() {
-    return this.children.flatMap(ch => this.getContent(ch));
+  public export(separator: string = '\r\n') {
+    return this.children.flatMap(ch => ch.getContentWithSubs()).join(separator);
   }
 
+  /** returns all children of the parent elements */
   private getSiblings(block: Block): Block[] {
-    return block.parentId ? this.childrenById[block.parentId] : this.children;
-  }
-
-  // helper for export
-  private getContent(block: Block): string[] {
-    return [block.content, ...block.children.flatMap(ch => this.getContent(ch))];
+    return block.parent ? this.childrenById[block.parent] : this.children;
   }
 
   private removeBlock(array: Block[], block: Block) {
-    removeFromArray(array, (o: Block) => block.equal(o));
+    removeFromArray(array, (o: Block) => o.equal(block));
   }
 
   private isChild(parent: Block, child: Block): boolean {

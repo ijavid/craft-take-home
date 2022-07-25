@@ -31,8 +31,12 @@ export class AppComponent {
   }
 
   public insertUnderSelected() {
-    const block = new Block(this.contentToInsert, this.selected);
+    const block = new Block(this.contentToInsert, this.selected?.id);
     this.service.insert([block]);
+
+    // alternative
+    // const block = new Block(this.contentToInsert);
+    // this.service.insert([block], this.selected?.id);
   }
 
   cleanSelection() {
@@ -69,7 +73,6 @@ export class AppComponent {
   }
 
   export() {
-    const data = this.service.export();
-    this.output.nativeElement.value = data.join('\r\n');
+    this.output.nativeElement.value = this.service.export();
   }
 }
